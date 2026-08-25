@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>드라이비(Drive-AI)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="tmapGrad" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ef4d9c"/>
+      <stop offset="35%" stop-color="#8b5cf6"/>
+      <stop offset="65%" stop-color="#22d3aa"/>
+      <stop offset="100%" stop-color="#2f7ff2"/>
+    </linearGradient>
+  </defs>
+</svg>
+<div class="dashboard">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-logo">🚗</span>
+      <span class="brand-name">드라이비<br>Drive-AI</span>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">출발 정보</div>
+      <label class="field-label" for="origin">출발지</label>
+      <div class="input-row">
+        <input type="text" id="origin" placeholder="어디서 출발하세요?" required list="origin-list">
+        <button type="button" id="locate-btn" class="icon-btn" title="내 위치 사용" aria-label="내 위치 사용">📍</button>
+        <button type="button" id="mic-btn" class="icon-btn" title="음성으로 입력" aria-label="음성으로 입력">🎤</button>
+      </div>
+      <datalist id="origin-list"></datalist>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">조건 설정</div>
+
+      <div class="field-label">소요 가능 시간</div>
+      <div class="chip-group" id="minutes-group" data-value="180">
+        <button type="button" class="chip" data-value="30">30분</button>
+        <button type="button" class="chip" data-value="60">1시간</button>
+        <button type="button" class="chip" data-value="120">2시간</button>
+        <button type="button" class="chip selected" data-value="180">3시간</button>
+        <button type="button" class="chip" data-value="240">4시간</button>
+        <button type="button" class="chip" data-value="360">6시간</button>
+        <button type="button" class="chip" data-value="480">8시간+</button>
+      </div>
+
+      <div class="field-label">동행</div>
+      <div class="chip-group" id="companion-group" data-value="혼자">
+        <button type="button" class="chip selected" data-value="혼자">🧍 혼자</button>
+        <button type="button" class="chip" data-value="커플">💑 커플</button>
+        <button type="button" class="chip" data-value="친구">👬 친구</button>
+        <button type="button" class="chip" data-value="가족">👨‍👩‍👧 가족</button>
+        <button type="button" class="chip" data-value="애견동반">🐕 애견동반</button>
+      </div>
+
+      <div class="field-label">오늘의 기분</div>
+      <div class="chip-group mood-group" id="mood-group" data-value="드라이브">
+        <button type="button" class="chip mood-chip selected" data-value="드라이브">🚗<span>드라이브</span></button>
+        <button type="button" class="chip mood-chip" data-value="경치">🏞️<span>경치</span></button>
+        <button type="button" class="chip mood-chip" data-value="맛집">🍽️<span>맛집</span></button>
+        <button type="button" class="chip mood-chip" data-value="힐링">🌿<span>힐링</span></button>
+      </div>
+
+      <label class="switch-row">
+        <span>왕복 코스로 추천</span>
+        <span class="switch">
+          <input type="checkbox" id="roundTrip" checked>
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </span>
+      </label>
+
+      <label class="switch-row">
+        <span>🆕 안 가본 곳 위주로 추천</span>
+        <span class="switch">
+          <input type="checkbox" id="avoidVisited">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </span>
+      </label>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">드라이브 이력</div>
+      <div class="history-list" id="history-list"></div>
+      <p class="history-empty" id="history-empty">아직 다녀온 기록이 없어요. 내비 버튼을 누르면 여기에 남아요.</p>
+      <button type="button" id="clear-history-btn" class="history-clear-btn hidden">이력 전체 삭제</button>
+    </div>
+
+    <button type="button" id="submit-btn" class="primary-btn">코스 추천받기</button>
+    <p class="hint" id="status-hint"></p>
+  </aside>
+
+  <main class="main">
+    <div class="main-header">
+      <div>
+        <p class="eyebrow">DRIVE-AI DASHBOARD</p>
+        <h1 class="main-title">추천 결과</h1>
+      </div>
+      <div class="header-badges">
+        <span class="badge weather-badge" id="weather-badge"></span>
+        <span class="badge season-badge" id="season-badge"></span>
+      </div>
+    </div>
+
+    <div class="placeholder" id="placeholder">
+      <div class="placeholder-emoji">🗺️</div>
+      <p>조건을 입력하고 추천받기를 누르면<br>이곳에 드라이브 코스가 나타나요.</p>
+    </div>
+
+    <div id="result-content" class="hidden">
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-icon">⏱️</span>
+          <span class="kpi-value" id="stat-time"></span>
+          <span class="kpi-label">총 소요시간</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-icon">📏</span>
+          <span class="kpi-value" id="stat-distance"></span>
+          <span class="kpi-label">총 거리</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-icon">⛽</span>
+          <span class="kpi-value" id="stat-fuel"></span>
+          <span class="kpi-label">예상 주유비</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-icon">🔁</span>
+          <span class="kpi-value" id="stat-type"></span>
+          <span class="kpi-label">코스 형태</span>
+        </div>
+      </div>
+
+      <div class="content-grid">
+        <div class="content-main">
+          <div class="panel">
+            <div class="panel-header">🗂️ 추천 옵션</div>
+            <div class="route-options" id="route-options"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">🗺️ 경로 지도</div>
+            <div id="map" class="map"></div>
+          </div>
+
+          <div class="panel hidden" id="waypoints-panel">
+            <div class="panel-header">📍 경유지</div>
+            <div class="stops timeline" id="stops-list"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">🏁 도착지</div>
+            <div class="stops timeline" id="destination-list"></div>
+          </div>
+
+          <button type="button" id="retry-btn" class="secondary-btn">🔄 다른 조합으로 다시 추천받기</button>
+        </div>
+
+        <div class="content-side">
+          <div class="panel highlight-panel">
+            <div class="panel-header">✨ 코스 요약</div>
+            <p class="highlight-text" id="highlight-text"></p>
+            <p class="warning-text" id="warning-text"></p>
+            <button type="button" id="tmap-cta" class="tmap-cta">
+              <svg class="tmap-icon" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <rect x="10" y="12" width="100" height="24" rx="12" fill="url(#tmapGrad)"/>
+                <rect x="46" y="12" width="28" height="96" rx="14" fill="url(#tmapGrad)"/>
+              </svg>
+              TMAP으로 즉시 길안내 받기
+            </button>
+            <p class="cta-note" id="tmap-cta-note"></p>
+            <button type="button" id="naver-full-cta" class="naver-cta hidden">🟢 네이버지도로 전체 경로 한번에 안내받기</button>
+          </div>
+
+          <div class="panel nearby-section hidden" id="nearby-section">
+            <div class="panel-header" id="nearby-title"></div>
+            <div class="nearby-scroll" id="nearby-scroll"></div>
+          </div>
+
+          <div class="panel blog-panel hidden" id="blog-panel">
+            <div class="panel-header">📝 관련 블로그 후기</div>
+            <div id="blog-groups"></div>
+          </div>
+
+          <div class="panel tip-card">
+            <span class="tip-label">💡 드라이브 팁</span>
+            <p id="tip-text"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
